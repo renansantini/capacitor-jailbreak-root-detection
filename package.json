@@ -1,6 +1,6 @@
 {
   "name": "@meedika/capacitor-jailbreak-root-detection",
-  "version": "6.0.0",
+  "version": "1.0.0",
   "description": "Jailbreak Root detection plugin for capacitor.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -12,7 +12,7 @@
     "android/build.gradle",
     "dist/",
     "ios/Plugin/",
-    "SwernimontCapacitorJailbreakRootDetection.podspec"
+    "MeedikaCapacitorJailbreakRootDetection.podspec"
   ],
   "author": "Meedika",
   "license": "MIT",
@@ -43,6 +43,7 @@
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
     "prepublishOnly": "npm run build"
+
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",
