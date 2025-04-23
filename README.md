@@ -1,11 +1,11 @@
-# @meedika/capacitor-jailbreak-root-detection
+# @renansantini/capacitor-jailbreak-root-detection
 
-This is a Capacitor 6 Jailbreak Root detection plugin.
+This is a Capacitor 7 Jailbreak Root detection plugin.
 
 ## Install
 
 ```bash
-npm install @meedika/capacitor-jailbreak-root-detection
+npm install @renansantini/capacitor-jailbreak-root-detection
 npx cap sync
 ```
 
