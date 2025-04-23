@@ -8,35 +8,22 @@ public class LessThan23 implements CheckApiVersion {
         return canExecuteCommand("/system/xbin/which su") || isSuperuserPresent();
     }
 
-    // executes a command on the system
     private static boolean canExecuteCommand(String command) {
-        boolean executeResult;
         try {
             Process process = Runtime.getRuntime().exec(command);
-            if(process.waitFor() == 0) {
-                executeResult = true;
-            } else {
-                executeResult = false;
-            }
+            BufferedReader in = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String output = in.readLine();
+            return output != null && !output.isEmpty();
         } catch (Exception e) {
-            executeResult = false;
+            return false;
         }
-
-        return executeResult;
     }
 
     private static boolean isSuperuserPresent() {
-        // Check if /system/app/Superuser.apk is present
         String[] paths = {
-                "/system/app/Superuser.apk",
-                "/sbin/su",
-                "/system/bin/su",
-                "/system/xbin/su",
-                "/data/local/xbin/su",
-                "/data/local/bin/su",
-                "/system/sd/xbin/su",
-                "/system/bin/failsafe/su",
-                "/data/local/su"
+            "/sbin/su", "/system/bin/su", "/system/xbin/su",
+            "/data/local/xbin/su", "/data/local/bin/su", "/system/sd/xbin/su",
+            "/system/bin/failsafe/su", "/data/local/su", "/system/app/Superuser.apk"
         };
 
         for (String path : paths) {
@@ -44,7 +31,6 @@ public class LessThan23 implements CheckApiVersion {
                 return true;
             }
         }
-
         return false;
     }
 }

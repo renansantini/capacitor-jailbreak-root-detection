@@ -24,49 +24,57 @@ public class EmulatorDetector {
             checkBuildProperties() ||
             checkEmulatorFiles() ||
             checkTelephonyManager() ||
-            checkPipes() ||
             checkQEmuDriverFile() ||
             checkQEmuProps()
         );
     }
 
     public boolean isDebuggedMode() {
-        boolean result = false;
         try {
-            if ((context.getPackageManager().getPackageInfo(context.getPackageName(), 0).
-                    applicationInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0)
-                result = true;
-            else
-                result = false;
+            ApplicationInfo appInfo = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).applicationInfo;
+            return (appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         } catch (PackageManager.NameNotFoundException e) {
-            result = false;
+            return false;
         }
-
-        return result;
     }
 
-    private boolean checkBuildProperties() {
-        String[] knownEmulatorBuildProperties = {
-            "ro.hardware",
-            "goldfish",
-            "ro.hardware",
-            "ranchu",
-            "ro.kernel.qemu",
-            "1",
-            "ro.product.model",
-            "sdk",
-            "ro.product.model",
-            "google_sdk",
-            "ro.product.model",
-            "sdk_x86",
-            "ro.product.model",
-            "vbox86p"
-        };
+    // --- Constantes ---
 
-        for (int i = 0; i < knownEmulatorBuildProperties.length; i += 2) {
-            String property = knownEmulatorBuildProperties[i];
-            String value = knownEmulatorBuildProperties[i + 1];
-            if (value.equals(getSystemProperty(property))) {
+    private static final String[][] KNOWN_EMULATOR_BUILD_PROPS = {
+        {"ro.hardware", "goldfish"},
+        {"ro.hardware", "ranchu"},
+        {"ro.kernel.qemu", "1"},
+        {"ro.product.model", "sdk"},
+        {"ro.product.model", "google_sdk"},
+        {"ro.product.model", "sdk_x86"},
+        {"ro.product.model", "vbox86p"},
+    };
+
+    private static final String[] KNOWN_EMULATOR_FILES = {
+        "/dev/socket/qemud",
+        "/dev/qemu_pipe",
+        "/system/lib/libc_malloc_debug_qemu.so",
+        "/sys/qemu_trace",
+        "/system/bin/qemu-props"
+    };
+
+    private static final String[][] KNOWN_QEMU_PROPS = {
+        {"ro.product.device", "qemu"},
+        {"ro.product.brand", "generic"},
+        {"ro.product.manufacturer", "unknown"},
+        {"ro.product.model", "sdk"},
+        {"ro.hardware", "goldfish"},
+        {"ro.hardware", "ranchu"},
+    };
+
+    private static final int MIN_QEMU_MATCHES = 3;
+
+
+    private boolean checkBuildProperties() {
+        for (String[] pair : KNOWN_EMULATOR_BUILD_PROPS) {
+            String prop = getSystemProperty(pair[0]);
+            if (prop != null && prop.toLowerCase().contains(pair[1].toLowerCase())) {
                 return true;
             }
         }
@@ -74,15 +82,7 @@ public class EmulatorDetector {
     }
 
     private boolean checkEmulatorFiles() {
-        String[] knownEmulatorFiles = {
-            "/dev/socket/qemud",
-            "/dev/qemu_pipe",
-            "/system/lib/libc_malloc_debug_qemu.so",
-            "/sys/qemu_trace",
-            "/system/bin/qemu-props"
-        };
-
-        for (String path : knownEmulatorFiles) {
+        for (String path : KNOWN_EMULATOR_FILES) {
             if (new File(path).exists()) {
                 return true;
             }
@@ -92,17 +92,9 @@ public class EmulatorDetector {
 
     private boolean checkTelephonyManager() {
         TelephonyManager tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-        String networkOperatorName = tm.getNetworkOperatorName();
-        return "Android".equalsIgnoreCase(networkOperatorName);
-    }
-
-    private boolean checkPipes() {
-        String[] knownEmulatorPipes = { "/dev/socket/qemud", "/dev/qemu_pipe" };
-
-        for (String path : knownEmulatorPipes) {
-            if (new File(path).exists()) {
-                return true;
-            }
+        if (tm != null) {
+            String networkOperatorName = tm.getNetworkOperatorName();
+            return "android".equalsIgnoreCase(networkOperatorName);
         }
         return false;
     }
@@ -110,53 +102,36 @@ public class EmulatorDetector {
     private boolean checkQEmuDriverFile() {
         File driverFile = new File("/proc/tty/driver");
         if (driverFile.exists() && driverFile.canRead()) {
-            byte[] data = new byte[(int) driverFile.length()];
-            try {
-                String driverData = new BufferedReader(new InputStreamReader(new FileInputStream(driverFile))).readLine();
-                return driverData.contains("goldfish") || driverData.contains("qemu");
-            } catch (Exception e) {
-                e.printStackTrace();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(driverFile)))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (line.contains("goldfish") || line.contains("qemu")) {
+                        return true;
+                    }
+                }
+            } catch (IOException ignored) {
             }
         }
         return false;
     }
 
     private boolean checkQEmuProps() {
-        int minQemuProps = 6;
-        String[] knownQemuProps = {
-            "ro.product.device",
-            "qemu",
-            "ro.product.brand",
-            "generic",
-            "ro.product.manufacturer",
-            "unknown",
-            "ro.product.model",
-            "sdk",
-            "ro.hardware",
-            "goldfish",
-            "ro.hardware",
-            "ranchu"
-        };
-
         int matchCount = 0;
-        for (int i = 0; i < knownQemuProps.length; i += 2) {
-            String property = knownQemuProps[i];
-            String value = knownQemuProps[i + 1];
-            if (value.equals(getSystemProperty(property))) {
+        for (String[] pair : KNOWN_QEMU_PROPS) {
+            String prop = getSystemProperty(pair[0]);
+            if (prop != null && prop.toLowerCase().contains(pair[1].toLowerCase())) {
                 matchCount++;
             }
         }
-        return matchCount >= minQemuProps;
+        return matchCount >= MIN_QEMU_MATCHES;
     }
 
     private String getSystemProperty(String propertyName) {
-        String propertyValue = "";
         try {
-            Class<?> systemPropertyClazz = Class.forName("android.os.SystemProperties");
-            propertyValue = (String) systemPropertyClazz.getMethod("get", String.class).invoke(systemPropertyClazz, propertyName);
+            Class<?> sp = Class.forName("android.os.SystemProperties");
+            return (String) sp.getMethod("get", String.class).invoke(sp, propertyName);
         } catch (Exception e) {
-            e.printStackTrace();
+            return null;
         }
-        return propertyValue;
     }
 }
